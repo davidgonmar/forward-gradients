@@ -44,14 +44,9 @@ class MLP(nn.Module):
 def create_train_state(rng, model, initial_learning_rate):
     params = model.init(rng, jnp.ones([1, 28, 28]))["params"]
 
-    learning_rate_schedule = optax.exponential_decay(
-        init_value=initial_learning_rate,
-        transition_steps=-10000,
-        decay_rate=math.e,
-        transition_begin=0,
-        staircase=False,
-    )
-    optimizer = optax.sgd(learning_rate=learning_rate_schedule)
+    def lr_schedule(step):
+      return initial_learning_rate * jnp.exp(-step / 10e4)
+    optimizer = optax.sgd(learning_rate=lr_schedule)
     return train_state.TrainState.create(
         apply_fn=model.apply, params=params, tx=optimizer
     )
@@ -73,12 +68,13 @@ def compute_metrics(logits, labels):
 
 @jax.jit
 def train_step(state: train_state.TrainState, batch, rng):
+    rng, rng_for_use = random.split(rng)
     def loss_fn(params):
         return compute_loss(params, batch, state.apply_fn)
 
-    loss, grads = forward_grad(loss_fn, rng)(state.params)
+    loss, grads = forward_grad(loss_fn, rng_for_use)(state.params)
     new_state = state.apply_gradients(grads=grads)
-    return loss, new_state
+    return loss, new_state, rng
 
 
 @jax.jit
@@ -108,16 +104,14 @@ def prepare_dataloader():
 
 
 def train_model(epochs, learning_rate):
-    rng = random.PRNGKey(0)
+    rng_init, rng = jax.random.split(random.PRNGKey(0), 2)
     model = MLP()
-    state = create_train_state(rng, model, learning_rate)
-
+    state = create_train_state(rng_init, model, learning_rate)
     train_ds, test_ds = prepare_dataloader()
 
     for epoch in range(epochs):
         for batch in tfds.as_numpy(train_ds):
-            rng, _ = random.split(rng)
-            loss, state = train_step(state, batch, rng)
+            loss, state, rng = train_step(state, batch, rng)
 
         test_accuracy = 0
         for batch in tfds.as_numpy(test_ds):
@@ -127,4 +121,5 @@ def train_model(epochs, learning_rate):
         print(f"Epoch {epoch + 1}, Test accuracy: {test_accuracy * 100:.2f}%")
 
 
-train_model(epochs=100, learning_rate=2e-5)
+train_model(epochs=1000, learning_rate=2e-5)
+
