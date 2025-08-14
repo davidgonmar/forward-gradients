@@ -1,4 +1,3 @@
-from jax._src.random import orthogonal
 import functools, jax, jax.numpy as jnp
 from jax import random, jvp, vmap, jit
 from jax.flatten_util import ravel_pytree
