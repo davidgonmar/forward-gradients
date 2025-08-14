@@ -9,7 +9,12 @@ import jax.nn as jnn
 import tensorflow as tf
 from typing import Any, Callable, Sequence, Optional
 import math
-from forward_grad import forward_grad_rand_dirs
+from lib import forward_grad_random_proj as forward_grad_rand_dirs
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--ortho", action="store_true")
+args = parser.parse_args()
 
 
 class MLP(nn.Module):
@@ -30,7 +35,7 @@ def create_train_state(rng, model, initial_learning_rate):
     def lr_schedule(step):
         return initial_learning_rate * jnp.exp(-step / 10e4)
 
-    optimizer = optax.sgd(learning_rate=lr_schedule)
+    optimizer = optax.adam(learning_rate=lr_schedule)
     return train_state.TrainState.create(
         apply_fn=model.apply, params=params, tx=optimizer
     )
@@ -57,7 +62,9 @@ def train_step(state: train_state.TrainState, batch, rng):
     def loss_fn(params):
         return compute_loss(params, batch, state.apply_fn)
 
-    loss, grads = forward_grad_rand_dirs(loss_fn, rng_for_use)(state.params)
+    loss, grads = forward_grad_rand_dirs(
+        loss_fn, rng_for_use, n_dirs=4, ortho=args.ortho
+    )(state.params)
     new_state = state.apply_gradients(grads=grads)
     return loss, new_state, rng
 
@@ -106,4 +113,4 @@ def train_model(epochs, learning_rate):
         print(f"Epoch {epoch + 1}, Test accuracy: {test_accuracy * 100:.2f}%")
 
 
-train_model(epochs=1000, learning_rate=2e-5)
+train_model(epochs=1000, learning_rate=0.01)

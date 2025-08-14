@@ -32,6 +32,8 @@ v_1,\ldots,v_n &\sim P \\
 \end{aligned}
 $$
 
+Note that the \(v_i\) need not be i.i.d. samples, they can be interdependent.
+
 ### Requirements
 JAX and Flax are used. Torch is difficult to work with when using forward mode autodiff.
 
