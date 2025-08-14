@@ -37,6 +37,12 @@ Note that the \(v_i\) need not be i.i.d. samples, they can be interdependent.
 ### Requirements
 JAX and Flax are used. Torch is difficult to work with when using forward mode autodiff.
 
+The exact versions used are in `requirements.txt`. To run transformer experiments, the additional requirements are in `requirements-transformers.txt`.
+
+Python 3.11 is used.
+
+The code will probably work with other versions of the libraries/Python.
+
 ### Extra
 This is just for me having fun experimenting, it is not optimized nor tried extensively.
 
