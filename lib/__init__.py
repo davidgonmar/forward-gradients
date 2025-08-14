@@ -14,15 +14,10 @@ def make_coord_step(loss_fn):
         rng, rk = random.split(rng)
         ks = random.randint(rk, (n_grads,), 0, p_flat.size)
         tang = jax.nn.one_hot(ks, p_flat.size, dtype=p_flat.dtype)
-
-        def proj(e):
-            _, g = jvp(lambda p: loss_fn(p, batch), (p_flat,), (e,))
-            return g
-
-        gks = vmap(proj)(tang)
+        _, f_lin = jax.linearize(lambda p: loss_fn(p, batch), p_flat)
+        gks = vmap(f_lin)(tang)
         p_flat = p_flat.at[ks].add(-lr * gks)
         return p_flat, rng
-
     return step
 
 
