@@ -9,24 +9,7 @@ import jax.nn as jnn
 import tensorflow as tf
 from typing import Any, Callable, Sequence, Optional
 import math
-
-
-def forward_grad(fun: Callable, rng: jax.random.PRNGKey):
-    def forward_grad_func(*primals: Any):
-        keys = jax.tree.unflatten(
-            jax.tree.structure(primals),
-            jax.random.split(rng, len(jax.tree.flatten(primals)[0])),
-        )
-        tangents = jax.tree.map(
-            lambda x, key: jax.random.normal(key, x.shape), primals, keys
-        )
-        loss, jvp = jax.jvp(fun, primals=primals, tangents=tangents)
-        return (
-            loss,
-            jax.tree.map(lambda tangent: jnp.clip(jvp, -5, 5) * tangent, tangents)[0],
-        )
-
-    return forward_grad_func
+from forward_grad import forward_grad_rand_dirs
 
 
 class MLP(nn.Module):
@@ -45,7 +28,8 @@ def create_train_state(rng, model, initial_learning_rate):
     params = model.init(rng, jnp.ones([1, 28, 28]))["params"]
 
     def lr_schedule(step):
-      return initial_learning_rate * jnp.exp(-step / 10e4)
+        return initial_learning_rate * jnp.exp(-step / 10e4)
+
     optimizer = optax.sgd(learning_rate=lr_schedule)
     return train_state.TrainState.create(
         apply_fn=model.apply, params=params, tx=optimizer
@@ -69,10 +53,11 @@ def compute_metrics(logits, labels):
 @jax.jit
 def train_step(state: train_state.TrainState, batch, rng):
     rng, rng_for_use = random.split(rng)
+
     def loss_fn(params):
         return compute_loss(params, batch, state.apply_fn)
 
-    loss, grads = forward_grad(loss_fn, rng_for_use)(state.params)
+    loss, grads = forward_grad_rand_dirs(loss_fn, rng_for_use)(state.params)
     new_state = state.apply_gradients(grads=grads)
     return loss, new_state, rng
 
@@ -122,4 +107,3 @@ def train_model(epochs, learning_rate):
 
 
 train_model(epochs=1000, learning_rate=2e-5)
-

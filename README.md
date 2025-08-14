@@ -1,0 +1,1 @@
+Training (or trying to train) neural nets without reverse mode autodiff.
