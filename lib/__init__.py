@@ -62,3 +62,22 @@ def forward_grad_random_proj(fun: Callable, rng: jax.random.PRNGKey, ortho = Tru
 
     return forward_grad_func
 
+# same but sign gradients and {-1, +1} vectors (following a Rademacher distribution)
+def forward_grad_sign_random_proj(fun: Callable, rng: jax.random.PRNGKey, n_dirs: int = 4) -> Callable:
+    def forward_grad_func(*primals: Any):
+        keys = jax.tree.unflatten(
+            jax.tree.structure(primals),
+            jax.random.split(rng, len(jax.tree.flatten(primals)[0])),
+        )
+        tangents = jax.tree.map(
+            lambda x, key: jax.random.rademacher(key, (n_dirs, *x.shape), dtype="float"), primals, keys
+        )
+        loss, f_lin = jax.linearize(fun, *primals)
+        vmapped = vmap(f_lin, in_axes=(0))
+        jvp_ = vmapped(*tangents)
+        return (
+            loss,
+            jax.tree.map(lambda tangent: (jax.numpy.sign(jvp_.reshape(-1, *((1,) * len(tangent.shape[1:]))) * tangent).mean(axis=0).clip(-1, 1)).astype("float"), tangents)[0],
+        )
+    return forward_grad_func
+        
